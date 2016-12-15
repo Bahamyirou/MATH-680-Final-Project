@@ -359,20 +359,168 @@ boot <- function(sim,n,p,theta,lam=0.5, rho=1.5, tau=0.1, tol=1e-7, maxit=2e4,B=
   res <- sum(N)/B
   res
 }
-
+##############################################
 #### results ####
+################################
 
-boot(simu,500,8,0.5,lam=0.5, rho=1.5, tau=0.1, tol=1e-7, maxit=2e4,B=100)
-boot(simu,500,8,0,lam=0.5, rho=1.5, tau=0.1, tol=1e-7, maxit=2e4,B=100)
-boot(simu2,500,8,0.5,lam=1, rho=1.5, tau=.005, tol=1e-7, maxit=2e4,B=100)
-boot(simu2,500,8,0,lam=0.05, rho=1.5, tau=.005, tol=1e-7, maxit=2e4,B=100)
+# boot(simu,500,8,0.5,lam=0.5, rho=1.5, tau=0.1, tol=1e-7, maxit=2e4,B=100)
+# 3
+#  boot(simu,500,8,0,lam=0.5, rho=1.5, tau=0.1, tol=1e-7, maxit=2e4,B=100)
+# 2.96
+#  boot(simu2,500,8,0.5,lam=1, rho=1.5, tau=.005, tol=1e-7, maxit=2e4,B=100)
+# 3
+# boot(simu2,500,8,0,lam=0.05, rho=1.5, tau=.005, tol=1e-7, maxit=2e4,B=100)
+# 2.07
 
-> boot(simu,500,8,0.5,lam=0.5, rho=1.5, tau=0.1, tol=1e-7, maxit=2e4,B=100)
-[1] 3
->  boot(simu,500,8,0,lam=0.5, rho=1.5, tau=0.1, tol=1e-7, maxit=2e4,B=100)
-[1] 2.96
->  boot(simu2,500,8,0.5,lam=1, rho=1.5, tau=.005, tol=1e-7, maxit=2e4,B=100)
-[1] 3
->  boot(simu2,500,8,0,lam=0.05, rho=1.5, tau=.005, tol=1e-7, maxit=2e4,B=100)
-[1] 2.07
+
+
+
+
+################################################################################
+# gglasso for comparison with Tweedie model
+################################################################################
+
+## Generate data set
+#X=simu(500,8,0)$X ; y=simu(500,8,0)$Y
+
+
+###############################
+#  
+library(gglasso)
+# load gglasso library
+
+#group <- rep(1:3,each=3)
+#m2 <- gglasso(x=X,y=y,group=group,loss="ls")
+#cv <- cv.gglasso(x=X,y=y, group=group, loss="ls",
+pred.loss="L2", lambda.factor=0.05, nfolds=5)
+
+###########
+#####
+#cv <- cv.gglasso(x=X, y=y, group=group, loss="ls",
+pred.loss="L2", lambda.factor=0.05, nfolds=5)
+#coef(cv, s = "lambda.min")
+###############################################################################
+
+count_gglasso <-  function(X=X,y=y)
+{
+  # load gglasso library
+  library(gglasso)
+  
+  group <- rep(1:3,each=3)
+  #m2 <- gglasso(x=X,y=y,group=group,loss="ls")
+  cv <- cv.gglasso(x=X, y=y, group=group, loss="ls",
+                   pred.loss="L2", lambda.factor=0.05, nfolds=5)
+  sol <- as.numeric( coef(cv, s = "lambda.min")) # get beta estimate for selected lambda
+  b1  <- sol[2:4]
+  b2  <-  sol[5:7]
+  b3  <-  sol[8:10]
+  k=rep(0,3)
+  # Count the number of active covarites in each block
+  for(i in 1:3)
+  {
+    if(b1[i]!=0){k[1]=k[1]+1}
+    if(b2[i]!=0){k[2]=k[2]+1}
+    if(b3[i]!=0){k[3]=k[3]+1}
+  }
+  # for each block where we observe at least one active covariate, set k to 1
+  for(i in 1:3)
+  {
+    if(k[1]!=0){k[1]=1}
+    if(k[2]!=0){k[2]=1}
+    if(k[3]!=0){k[3]=1}
+  }
+  # Count the number of active block
+  count <- sum(k)
+  count
+  
+}
+
+########### 
+boot_gglasso <- function(sim,n,p,theta,B=B)
+{
+  #### monte carlo
+  N=rep(0,B)
+  for(b in 1:B)
+  {
+    set.seed(b)
+    # apply count function
+    data=sim(n,p,theta)
+    X=data$X ; y=data$Y
+    N[b] <- count_gglasso(X=X,y=y)
+  }
+  
+  res <- sum(N)/B
+  res
+}
+
+#boot_gglasso(simu,500,8,0.5,B=100) #1.11
+
+# boot_gglasso(simu,500,8,0,B=100) #1.31
+
+#boot_gglasso(simu2,500,8,0.5,B=100) #
+
+#boot_gglasso(simu2,500,8,0,B=100) #
+
+
+################################################################################
+# Lasso for comparison with Tweedie model
+################################################################################
+
+
+
+# count_Lasso(X=X,y=y)
+count_Lasso <-  function(X=X,y=y)
+{
+  library(glmnet)
+  cvfit = cv.glmnet(X, y)
+  sol <- as.numeric(coef(cvfit, s = "lambda.min")) # get beta estimate for selected lambda
+  b1  <- sol[2:4]
+  b2  <-  sol[5:7]
+  b3  <-  sol[8:10]
+  k=rep(0,3)
+  # Count the number of active covarites in each block
+  for(i in 1:3)
+  {
+    if(b1[i]!=0){k[1]=k[1]+1}
+    if(b2[i]!=0){k[2]=k[2]+1}
+    if(b3[i]!=0){k[3]=k[3]+1}
+  }
+  # for each block where we observe at least one active covariate, set k to 1
+  for(i in 1:3)
+  {
+    if(k[1]!=0){k[1]=1}
+    if(k[2]!=0){k[2]=1}
+    if(k[3]!=0){k[3]=1}
+  }
+  # Count the number of active block
+  count <- sum(k)
+  count
+  
+}
+
+########### 
+boot_Lasso <- function(sim,n,p,theta,B=B)
+{
+  #### monte carlo
+  N=rep(0,B)
+  for(b in 1:B)
+  {
+    set.seed(b)
+    # apply count function
+    data=sim(n,p,theta)
+    X=data$X ; y=data$Y
+    N[b] <- count_Lasso(X=X,y=y)
+  }
+  
+  res <- sum(N)/B
+  res
+}
+
+# boot_Lasso(simu,500,8,0.5,B=100) #1.22
+# boot_Lasso(simu,500,8,0,B=100) #1.79
+
+# boot_Lasso(simu2,500,8,0.5,B=100) #2.27
+#boot_Lasso(simu2,500,8,0,B=100) #0.56
+
+
 
